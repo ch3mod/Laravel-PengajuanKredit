@@ -1,0 +1,150 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\Http\Request;
+use App\Models\PengajuanKredit;
+use App\Models\Nasabah;
+use App\Models\Product;
+use App\Models\User;
+use Illuminate\Support\Facades\Log;
+
+class PengajuanKreditController extends Controller
+{
+    public function dashboard()
+    {
+        $products = Product::all();
+        $user = auth()->user();
+        $pengajuans = PengajuanKredit::with(['nasabah', 'product'])->latest()->orderBy('created_at', 'desc')->get();
+        return view('pengajuan.dashboard', compact('pengajuans', 'user', 'products'));
+    }
+
+    public function create()
+    {
+        $nasabahs = Nasabah::all();
+        $products = Product::all();
+        return view('pengajuan.create', compact('nasabahs', 'products'));
+    }
+
+    public function store(Request $request)
+    {
+        $request->validate([
+            'nasabah_id' => 'required|exists:nasabah,id',
+            'product_id' => 'required|exists:products,id',
+            'tanggal_pengajuan' => 'required|date',
+            'jaminan' => 'required|string|max:255',
+            'jumlah_tanggungan' => 'required|integer|min:0',
+            'jumlah_pemasukan' => 'required|string',
+            'jumlah_pengeluaran' => 'required|string',
+            'jumlah_pengajuan' => 'required|string|min:0',
+        ]);
+
+
+        $jumlahPemasukan = (float) str_replace(['Rp ', '.'], '', $request->jumlah_pemasukan);
+        $jumlahPengeluaran = (float) str_replace(['Rp ', '.'], '', $request->jumlah_pengeluaran);
+        $jumlahPengajuan = (int) str_replace('.', '', $request->jumlah_pengajuan);
+
+        // Hitung asuransi dan jumlah yang di-ACC
+        
+        $asuransi = $jumlahPengajuan * 0.18;
+        $totalPotongan = $asuransi;
+        $jumlahACC = $jumlahPengajuan - $totalPotongan;
+
+        // Simpan ke database
+        PengajuanKredit::create([
+            'nasabah_id' => $request->nasabah_id,
+            'product_id' => $request->product_id,
+            'tanggal_pengajuan' => $request->tanggal_pengajuan,
+            'jaminan' => $request->jaminan,
+            'jumlah_tanggungan' => $request->jumlah_tanggungan,
+            'jumlah_pemasukan' => $jumlahPemasukan,
+            'jumlah_pengeluaran' => $jumlahPengeluaran,
+            'jumlah_pengajuan' => $jumlahPengajuan,
+            'jumlah_acc' => max($jumlahACC, 0),
+        ]);
+
+        return redirect()->route('pengajuan.dashboard')->with('success', 'Pengajuan kredit berhasil diajukan.');
+    }
+
+
+
+
+    public function edit($id)
+    {
+        $pengajuan = PengajuanKredit::findOrFail($id);
+        $nasabahs = Nasabah::all();
+        $products = Product::all();
+        return view('pengajuan.edit', compact('pengajuan', 'nasabahs', 'products'));
+    }
+
+    public function update(Request $request, $id)
+    {
+        $pengajuan = PengajuanKredit::findOrFail($id);
+
+        $request->validate([
+            'tanggal_pengajuan' => 'required|date',
+            'product_id' => 'required|exists:products,id',
+            'jaminan' => 'required|string|max:255',
+            'jumlah_tanggungan' => 'required|integer|min:0',
+            'jumlah_pemasukan' => 'required|string',
+            'jumlah_pengeluaran' => 'required|string',
+            'jumlah_pengajuan' => 'required|string|min:0',
+        ]);
+
+        $jumlahPengajuan = (int) str_replace('.', '', $request->jumlah_pengajuan);
+        $jumlahPemasukan = (float) str_replace(['Rp ', '.'], '', $request->jumlah_pemasukan);
+        $jumlahPengeluaran = (float) str_replace(['Rp ', '.'], '', $request->jumlah_pengeluaran);
+
+        $asuransi = $jumlahPengajuan * 0.18;
+        $totalPotongan = $asuransi;
+
+        $jumlahACC = $jumlahPengajuan - $totalPotongan;
+
+        $pengajuan->update([
+            'tanggal_pengajuan' => $request->tanggal_pengajuan,
+            'product_id' => $request->product_id,
+            'jaminan' => $request->jaminan,
+            'jumlah_tanggungan' => $request->jumlah_tanggungan,
+            'jumlah_pemasukan' => $jumlahPemasukan,
+            'jumlah_pengeluaran' => $jumlahPengeluaran,
+            'jumlah_pengajuan' => $jumlahPengajuan,
+            'jumlah_acc' => max($jumlahACC, 0),
+        ]);
+
+        return redirect()->route('pengajuan.dashboard')->with('success', 'Pengajuan berhasil diperbarui.');
+    }
+
+
+
+    public function destroy($id)
+    {
+        $pengajuan = PengajuanKredit::findOrFail($id);
+        $pengajuan->delete();
+
+        return redirect()->route('pengajuan.dashboard')->with('success', 'Pengajuan kredit berhasil dihapus.');
+    }
+
+    public function updateStatus(Request $request, $id)
+    {
+        $pengajuan = PengajuanKredit::findOrFail($id);
+
+        $request->validate([
+            'status' => 'required|string|in:approved,rejected',
+        ]);
+
+        $pengajuan->update([
+            'status' => $request->status,
+        ]);
+
+        return redirect()->route('pengajuan.dashboard')->with('success', 'Status pengajuan berhasil diperbarui.');
+    }
+
+    public function createWithNasabah($nasabah_id)
+    {
+        $nasabah = Nasabah::findOrFail($nasabah_id);
+        $products = Product::all();
+        $user = auth()->user();
+
+        return view('pengajuan.create', compact('nasabah', 'products', 'user'));
+    }
+}
