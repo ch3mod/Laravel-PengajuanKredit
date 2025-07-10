@@ -85,12 +85,3 @@ Berikut adalah langkah-langkah untuk menjalankan proyek ini di lingkungan lokalm
     ```
 
 9. **Selesai!** Aplikasi sekarang berjalan dan bisa diakses di **http://127.0.0.1:8000**.
-
----
-
-### Akun Demo
-Untuk mencoba, kamu bisa login menggunakan akun berikut:
-- **Admin:** `admin@example.com` | `password`
-- **User:** `user@example.com` | `password`
-
-*(Catatan: Sesuaikan detail akun demo ini jika kamu membuatnya berbeda di Seeder)*
